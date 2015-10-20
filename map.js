@@ -214,16 +214,23 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
             
             //draw the lines pointing from the labels to the smaller states
             function makeLines(map_lines) {
-                var i;
-                function makeLine(lineNumber) {
-                    var line = map_lines[lineNumber];
-                    m.maplines[lineNumber] = m.paper.path(["M", line[0], line[1], "L", line[2], line[3]]);
-                    m.maplines[lineNumber].attr({"stroke-width": 0.5, "fill": "#888888"});
+                var i, ii, state;
+                function makeLine(lineNumber, state) {
+                    var line = map_lines[state][lineNumber];
+					if (typeof(m.maplines[state]) === "undefined") {
+						m.maplines[state] = [];	
+					}
+                    m.maplines[state][lineNumber] = m.paper.path(["M", line[0], line[1], "L", line[2], line[3]]);
+                    m.maplines[state][lineNumber].attr({"stroke-width": 0.5, "fill": "#888888"});
                 }
-                m.maplines = [];
-                for (i = 0; i < map_lines.length; i += 1) {
-                    makeLine(i);
-                }
+                m.maplines = {};
+				for (state in map_lines) {
+					if (map_lines.hasOwnProperty(state)) {
+						for (i = 0, ii=map_lines[state].length; i < ii; i += 1) {
+							makeLine(i, state);
+						}
+					}
+				}
             }
             makeLines(paths.lines);
             
@@ -272,8 +279,72 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
 		
 		this.makeLegend();
 		
-   
-        
+		/*initialize list of hidden states - all visible at first*/
+		this.hiddenStates = (function(m){
+			var returnObj = {}, state;
+			for (state in m.stateObjs) {
+				if (m.stateObjs.hasOwnProperty(state)) {
+					returnObj[state] = false;
+				}
+			}
+			return returnObj;
+		})(this);
+		
+		this.fadeInAnimations = {};
+		this.fadeOutAnimations = {};
+		this.lineAnimations = {};
+		this.labelFadeInAnimations = {};
+		this.labelFadeOutAnimations = {};
+		
+		this.showStates = function(stateList, duration) {
+			var state, m = this, cb = function() {
+				var state = m.stateCodes[this.id];
+				m.hiddenStates[state] = false;
+			};
+			for (var i = 0,ii=stateList.length;i<ii;i++) {
+				state = stateList[i];
+				if (this.hiddenStates[state] === true) {
+					this.stateObjs[state].show();
+					this.stateLabelObjs[state].show();
+					this.fadeInAnimations[state] = this.stateObjs[state].animate({opacity:1},duration,"linear",cb);
+					this.labelFadeInAnimations[state] = this.stateLabelObjs[state].animate({opacity:1},duration,"linear");
+					if (typeof(this.maplines[state]) !== "undefined") {
+						if (typeof(this.lineAnimations[state]) === "undefined") {
+							this.lineAnimations[state] = [];
+						}
+						for (var j = 0,jj=this.maplines[state].length;j<jj;j++) {
+							this.lineAnimations[state][j] = this.maplines[state][j].animate({opacity:1},duration,"linear");	
+						}
+					}
+				}
+				
+			}
+		};
+		
+		this.hideStates = function(stateList, duration) {
+			var state, m = this, cb = function() {
+				var state = m.stateCodes[this.id];
+				m.hiddenStates[state] = true;
+				m.stateObjs[state].hide();
+				m.stateLabelObjs[state].hide();
+			};
+			for (var i = 0, ii=stateList.length;i<ii;i++) {
+				state = stateList[i];
+				if (this.hiddenStates[state] === false) {
+					this.fadeOutAnimations[state] = this.stateObjs[state].animate({opacity:0.01},duration,"linear",cb);
+					this.labelFadeOutAnimations[state] = this.stateLabelObjs[state].animate({opacity:0},duration,"linear");
+					if (typeof(this.maplines[state]) !== "undefined") {
+						if (typeof(this.lineAnimations[state]) === "undefined") {
+							this.lineAnimations[state] = [];
+						}
+						for (var j = 0,jj=this.maplines[state].length;j<jj;j++) {
+							this.lineAnimations[state][j] = this.maplines[state][j].animate({opacity:0},duration,"linear");	
+						}
+					}
+				}
+				
+			}
+		};
     };
     return map;
 });
