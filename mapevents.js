@@ -136,16 +136,25 @@ define(["jquery"], function ($) {
         
         /*Focus on the state*/
         m.focusOn = function (s) {
-            var coords,
-                prop,
+			
+			if (typeof(m.disablePopupsOn) !== "undefined") {
+				if (typeof(m.disablePopupsOn[s]) !== "undefined") {
+					if (m.disablePopupsOn[s] === 1) {
+						return false;	
+					}
+				}
+			}
+
+            var //coords,
+                //prop,
                 box_anchor,
                 verticalAlign = "top",
                 horizontalAlign = "left",
                 popup,
                 popup_container,
-                popup_subcontainer,
-                stateAnimation,
-                oldStateAnimation,
+               // popup_subcontainer,
+               // stateAnimation,
+               // oldStateAnimation,
                 animatingState;
             
             //Check if there's a previously focused state

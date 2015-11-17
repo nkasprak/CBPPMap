@@ -282,6 +282,11 @@ define(["jquery"], function ($) {
                             } else {
                                 m.stateLabelObjs[state].attr("fill", "#000000");
                             }
+							if (typeof(m.labelColors) !== "undefined") {
+								if (m.labelColors[state] !== "undefined") {
+									m.stateLabelObjs[state].attr("fill",m.labelColors[state]);	
+								}
+							}
                         }
                     }
                 }

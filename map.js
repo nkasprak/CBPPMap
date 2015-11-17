@@ -66,6 +66,18 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
                 return false;
             };
         }
+		
+		if (ops.labelsToHide) {
+			m.labelsToHide = ops.labelsToHide;	
+		}
+		
+		if (ops.disablePopupsOn) {
+			m.disablePopupsOn = ops.disablePopupsOn;	
+		}
+		
+		if (ops.labelColors) {
+			m.labelColors = ops.labelColors;	
+		}
         
         if (ops.hideUS) {
             delete paths.states.US;
@@ -182,6 +194,14 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
 					"font-family": m.fontFamily
 				});
 				
+				if (typeof(m.labelsToHide) !== "undefined") {
+					if (typeof(m.labelsToHide[state]) !== "undefined") {
+						if (m.labelsToHide[state] === 1) {
+							m.stateLabelObjs[state].attr("opacity",0);
+						}
+					}
+				}
+				
 				//store raphael IDs of each label
                 if (typeof (m.stateTextIDs === "undefined")) {m.stateTextIDs = {}; }
 				m.stateTextIDs[state] = m.stateLabelObjs[state].node.raphaelid;
@@ -228,9 +248,16 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
 					if (map_lines.hasOwnProperty(state)) {
 						for (i = 0, ii=map_lines[state].length; i < ii; i += 1) {
 							makeLine(i, state);
+							if (typeof(m.labelsToHide) !== "undefined") {
+								if (m.labelsToHide[state] === 1) {
+									m.maplines[state][i].attr("opacity",0);
+								}
+							}
 						}
 					}
 				}
+				
+				
             }
             makeLines(paths.lines);
             
@@ -262,22 +289,28 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
 			this.max = theMax;
 			this.colors.customMax = theMax;
 		};
-        
-		this.makeLegend = function() {
-			
-			this.legendMaker = legend;
-			this.legendMaker.setBounds(m.min, m.max);
-			this.legendMaker.defineColors(m.colors.colorConfig.lowColor, m.colors.colorConfig.highColor, m.colors.colorConfig.zeroColor);
-			if (ops.legendFormatter) {
-				this.legendMaker.setFormatter(ops.legendFormatter);
-			}
-			if (ops.hideLegend !== true) {
-				this.legendMaker.draw(this);
-			}
-			
-		};
 		
-		this.makeLegend();
+		/*if (ops.hideLegend) {
+			this.makeLegend = function(){};
+		} else {*/
+        
+			this.makeLegend = function() {
+				
+				this.legendMaker = legend;
+				this.legendMaker.setBounds(m.min, m.max);
+				this.legendMaker.defineColors(m.colors.colorConfig.lowColor, m.colors.colorConfig.highColor, m.colors.colorConfig.zeroColor);
+				if (ops.legendFormatter) {
+					this.legendMaker.setFormatter(ops.legendFormatter);
+				}
+				if (ops.hideLegend !== true) {
+					this.legendMaker.draw(this);
+				}
+				
+			};
+			
+			this.makeLegend();
+		
+		//}
 		
 		/*initialize list of hidden states - all visible at first*/
 		this.hiddenStates = (function(m){
