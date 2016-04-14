@@ -67,6 +67,12 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
             };
         }
 		
+		if (ops.fullScaleWidth) {
+			m.fullScaleWidth = ops.fullScaleWidth;	
+		} else {
+			m.fullScaleWidth = 580;	
+		}
+		
 		if (ops.labelsToHide) {
 			m.labelsToHide = ops.labelsToHide;	
 		}
@@ -84,7 +90,17 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
             delete paths.text.US;
         }
         
+		if (ops.brightnessThreshold) {
+			m.brightnessThreshold = ops.brightnessThreshold;	
+		} else {
+			m.brightnessThreshold = 200;	
+		}
+		
         m.colorConfig = ops.colorConfig;
+		
+		if (ops.colorBins) {
+			m.colorBins = ops.colorBins;	
+		}
         
         /*create the main Raphael canvas*/
         m.paper = new Raphael(ops.mapDivID, m.width, m.height);
@@ -92,6 +108,7 @@ define(["jquery", "raphael", "uspaths", "mapcolors", "mapevents", "legend"], fun
         /*scale the canvas to accomodate the path coordinate system*/
         m.paper.setViewBox(0, 0, m.viewX, m.viewY);
         m.scaleFactor = m.width / m.viewX;
+		
        
         /*The above scaling feature doesn't work quite right in IE8 (which uses VML) - below is a nasty hack fix*/
         (function () {

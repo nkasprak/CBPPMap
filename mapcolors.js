@@ -77,60 +77,115 @@ define(["jquery"], function ($) {
 
         //Calculate colors based on map data
         c.calcStateColors = function () {
-            var scale, state, dataPoint, dMax, dMin, calcColor, highRGB, lowRGB, zeroRGB, dataIndex, spansZero;
+            var scale, cScale, calcCScale, state, calcColor, stateColor, highRGB, lowRGB, zeroRGB, spansZero, colorBins;
+
+			calcCScale = function(spansZero, dataPoint, dMin, dMax) {
+				//"scale" here becomes "cScale" in the above calcColor function
+				if (spansZero) {
+					//Data has positive and negative values - use a zero color
+					//Subtract 1 from the scale value - see note above (desired range is -1 to -2)
+					if (dataPoint < 0) { 
+						scale = -(dataPoint - dMin) / -dMin - 1;
+						scale = Math.max(-2,Math.min(-1,scale)); 
+					} else { scale = dataPoint / dMax; }
+					
+				} else {
+					//Data is entirely positive or negative - don't use special zero color
+					scale = (dataPoint - dMin) / (dMax - dMin);
+				}
+				if (dataPoint === null) {scale = null;}
+				return scale;
+			};
+
 
             /*Get boundary colors*/
             highRGB = c.hexToRGB(c.colorConfig.highColor);
             zeroRGB = c.hexToRGB(c.colorConfig.zeroColor);
             lowRGB = c.hexToRGB(c.colorConfig.lowColor);
 
+			
+
             /*cScale is calculated based on the data. For data that doesn't go through zero,
             0 = min and 1 = max. For data that does go through zero, dataMin to zero is mapped to
             -1 to -2, and zero to dataMax is mapped to 0 to 1, for reasons explained below*/
             calcColor = function (cScale) {
                 var rgb = [], rgbVal, i;
-                if (isNaN(cScale)) {
+                if (isNaN(cScale) || cScale === null) {
                     return c.colorConfig.noDataColor;
                 }
+				/*Fit to bounds*/
+				cScale = Math.max(-2, Math.min(1, cScale));
                 for (i = 0; i < 3; i += 1) {
                     if (spansZero) {
                         /*if the actual value was negative, cScale goes from -1 to -2, just as a signal
                         to use negative part of the gradient (originally was 0 to -1 but data min was 
                         assigned to zero and was ambiguous as to which gradient it should use)*/
-                        if (cScale <= -1) {
+                        if (cScale <= -1 && cScale >= -2) {
                             /*convert it back to a normal 0 to 1 range and calc color*/
                             rgbVal = -(cScale + 1) * (zeroRGB[i] - lowRGB[i]) + lowRGB[i];
                         } else {
-                            rgbVal = cScale * (highRGB[i] - zeroRGB[i]) + zeroRGB[i];
+                            rgbVal = Math.max(0,Math.min(1,cScale)) * (highRGB[i] - zeroRGB[i]) + zeroRGB[i];
                         }
                     } else {
-                        rgbVal = cScale * (highRGB[i] - lowRGB[i]) + lowRGB[i];
+                        rgbVal = Math.max(0,Math.min(cScale)) * (highRGB[i] - lowRGB[i]) + lowRGB[i];
                     }
                     rgb[i] = Math.round(rgbVal);
                 }
                 return c.RGBToHex(rgb);
             };
-
-            /*For some reason these are local variables*/
-            dMax = m.max;
-            dMin = m.min;
             
-            spansZero = (dMin < 0 && dMax > 0);
+            spansZero = (m.min < 0 && m.max > 0);
+			
+			//process color bins if they exist
+			colorBins = (function(b) {
+				var cB = [], i = 0, ii, midPoint, cScale;
+				if (typeof(b) !== "undefined") {
+					ii = b.length;
+					for (i;i<ii;i++) {	
+						cB[i] = {};
+						if (typeof(b[i].color) === "undefined") {
+							midPoint = (b[i].max + b[i].min)/2;
+							cScale = calcCScale(spansZero, midPoint, m.min, m.max);
+							cB[i].color = calcColor(cScale);
+						} else {
+							cB[i].color = b[i].color;	
+						}
+						cB[i].min = 2;
+						cB[i].max = 2;
+						cB[i].type = "range";
+						if (typeof(b[i].min)!=="undefined") {
+							cB[i].min = calcCScale(spansZero, b[i].min, m.min, m.max);
+						}
+						if (typeof(b[i].max)!=="undefined") {
+							cB[i].max = calcCScale(spansZero, b[i].max, m.min, m.max);
+						}
+						if (typeof(b[i].type)!=="undefined") {
+							cB[i].type = b[i].type;
+						}
+					}
+				}
+				return cB;
+			}(m.colorBins));
+			
+			/*wrapper for calcColor function that accounts for bins*/
+			stateColor = function(cScale, bins) {
+				var NAindex = -1;
+				for (var i = 0, ii = bins.length; i<ii; i++) {
+					if (bins[i].type === "NA") {NAindex = i;}
+					if (cScale >= bins[i].min && cScale < bins[i].max) {
+						return bins[i].color;	
+					}
+				}
+				if (NAindex !== -1) {
+					return bins[NAindex].color;	
+				}
+				return calcColor(cScale);
+			};
 
             for (state in m.data) {
                 if (m.data.hasOwnProperty(state)) {
-                    dataPoint = m.data[state][m.dataIndex];
-                    
-                    //"scale" here becomes "cScale" in the above calcColor function
-                    if (spansZero) {
-                        //Data has positive and negative values - use a zero color
-                        //Subtract 1 from the scale value - see note above (desired range is -1 to -2)
-                        if (dataPoint < 0) { scale = -(dataPoint - dMin) / -dMin - 1; } else { scale = dataPoint / dMax; }
-                    } else {
-                        //Data is entirely positive or negative - don't use special zero color
-                        scale = (dataPoint - dMin) / (dMax - dMin);
-                    }
-                    c.stateColors[state] = calcColor(scale);
+                    cScale = calcCScale(spansZero, m.data[state][m.dataIndex], m.min, m.max);
+                    c.stateColors[state] = stateColor(cScale, colorBins);
                 }
             }
         };
@@ -221,6 +276,14 @@ define(["jquery"], function ($) {
             if (duration > 0) {
                 toAnimate = {};
             }
+			
+			var externalLabelStates = function(arr) {
+				var o = {};
+				for (var i = 0,ii=arr.length;i<ii;i++) {
+					o[arr[i]] = true;	
+				}
+				return o;
+			}(["NH","VT","MA","RI","CT","NJ","DE","MD","DC","HI"]);
             
             /*Particularly dark states need to have a white label - calculate
             brightness of color*/
@@ -251,36 +314,19 @@ define(["jquery"], function ($) {
 								m.stateShadows[state].remove();
 								m.stateGlows[state].remove();
 							}
-							/*bbox = m.stateObjs[state].getBBox();
-							centerPoint = {};
-							centerPoint.x = Math.round(bbox.x + bbox.width/2);
-							centerPoint.y = Math.round(bbox.y + bbox.height/2);
-							tString = "s0.95, 0.95, " + centerPoint.x + ", " + centerPoint.y;
-							m.stateShadows[state] = m.stateObjs[state].clone().transform(tString).hide();
-							m.stateGlows[state] = m.stateShadows[state].glow({width: 6, color: c.colorConfig.highlightColor});*/
 							m.stateObjs[state].attr("stroke",c.colorConfig.highlightColor);
 							m.stateObjs[state].attr("stroke-width",3);
-							/*m.stateObjs[state].toFront();
-							//m.stateGlows[state].toFront();
-							m.stateLabelObjs[state].toFront();*/
-
 						} else {
-							/*if (typeof(m.stateShadows) !== "undefined") {
-								if (typeof(m.stateShadows[state]) !== "undefined") {
-									m.stateShadows[state].remove();
-									m.stateGlows[state].remove();
-								}
-							}*/
 							m.stateObjs[state].attr("stroke","#000000");
 							m.stateObjs[state].attr("stroke-width",1);
 						}
 						
                         if (m.stateLabelObjs[state]) {
                             //If the color is dark, make the label white
-                            if (brightness(c.stateColors[state]) < 200) {
-                                m.stateLabelObjs[state].attr("fill", "#ffffff");
-                            } else {
+                            if (brightness(c.stateColors[state]) >= m.brightnessThreshold || externalLabelStates[state]) {
                                 m.stateLabelObjs[state].attr("fill", "#000000");
+                            } else {
+                                m.stateLabelObjs[state].attr("fill", "#ffffff");
                             }
 							if (typeof(m.labelColors) !== "undefined") {
 								if (m.labelColors[state] !== "undefined") {
@@ -297,8 +343,8 @@ define(["jquery"], function ($) {
 					//bring non-highlighted states in front of glows
 						if (m.highlightBorder === true && m.data[state][m.highlightIndex] === 1) {
 							m.stateObjs[state].toFront();
-							m.stateLabelObjs[state].toFront();
 						}
+						m.stateLabelObjs[state].toFront();
 					}
 				}
 			 }
